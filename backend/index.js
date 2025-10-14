@@ -18,7 +18,7 @@ const io = new Server(server, {
       const allowedOrigins = [
         'http://localhost:5173',
         process.env.CLIENT_URL,
-        'https://promanage-app.vercel.app' // Update after deploy
+        'https://promanage-app.vercel.app'
       ].filter(Boolean)
       
       if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
@@ -32,32 +32,25 @@ const io = new Server(server, {
   }
 });
 
-
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-// app.use(cors());  isko update karke neeche wala part dala h 
 // ✅ CORS Configuration for Production
 const allowedOrigins = [
-  'http://localhost:5173',           // Local development
-  'http://localhost:3000',           // Local development alternative
-  process.env.CLIENT_URL,            // Production URL from .env
-  'https://promanage-app.vercel.app', // Your actual Vercel URL (update after deploy)
+  'http://localhost:5173',
+  'http://localhost:3000',
+  process.env.CLIENT_URL,
+  'https://promanage-app.vercel.app',
 ]
 
-// Filter out undefined values
 const validOrigins = allowedOrigins.filter(Boolean)
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman)
     if (!origin) return callback(null, true)
     
-    // Check if origin is in allowed list
     if (validOrigins.includes(origin)) {
       callback(null, true)
     } else if (origin.endsWith('.vercel.app')) {
-      // Allow all Vercel preview deployments
       callback(null, true)
     } else {
       callback(new Error('Not allowed by CORS'))
@@ -100,7 +93,19 @@ try {
   console.log('⚠️ AI Service not found');
 }
 
-// ✅ Add these routes (line 54 ke baad)
+// ═══════════════════════════════════════════════════════════
+// BASIC ENDPOINTS
+// ═══════════════════════════════════════════════════════════
+
+app.get('/', (req, res) => {
+  res.json({ message: 'ProManage+ API is running' });
+});
+
+// ═══════════════════════════════════════════════════════════
+// EMPLOYEE MANAGEMENT ENDPOINTS
+// ═══════════════════════════════════════════════════════════
+
+// ✅ Create employee (non-API route for backward compatibility)
 app.post('/create-employee', authenticate, async (req, res) => {
   const { email, full_name, mobile, password } = req.body;
   const manager_id = req.user.id;
@@ -138,56 +143,12 @@ app.post('/create-employee', authenticate, async (req, res) => {
   }
 });
 
-app.post('/invite-employee', authenticate, async (req, res) => {
-  const { email } = req.body;
+// ✅ Create employee endpoint with auth (API route)
+app.post('/api/create-employee', authenticate, async (req, res) => {
+  const { email, full_name, mobile, password } = req.body;
   const manager_id = req.user.id;
 
   try {
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    const expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const { error: inviteError } = await supabase.from('invites').insert({
-      email,
-      manager_id,
-      token,
-      expires_at
-    });
-
-    if (inviteError) throw inviteError;
-
-    const inviteLink = `${process.env.CLIENT_URL}/accept-invite?token=${token}`;
-
-    res.json({ 
-      success: true,
-      inviteLink,
-      message: 'Invitation created successfully' 
-    });
-  } catch (err) {
-    console.error('Invite error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-// ═══════════════════════════════════════════════════════════
-// BASIC ENDPOINTS
-// ═══════════════════════════════════════════════════════════
-
-app.get('/', (req, res) => {
-  res.json({ message: 'ProManage+ API is running' });
-});
-
-// ✅ Create employee endpoint with auth
-app.post('/api/create-employee', authenticate, async (req, res) => {
-  const { email, full_name, mobile, password } = req.body;
-  const manager_id = req.user.id; // ✅ From auth token
-
-  try {
-    // Use provided password or generate temp one
     const finalPassword = password || Math.random().toString(36).slice(-8);
     
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -229,7 +190,6 @@ app.post('/api/create-employee', authenticate, async (req, res) => {
         await transporter.sendMail(mailOptions);
       } catch (emailError) {
         console.error('Email sending failed:', emailError);
-        // Don't fail the request if email fails
       }
     }
 
@@ -244,7 +204,42 @@ app.post('/api/create-employee', authenticate, async (req, res) => {
   }
 });
 
-// ✅ Invite employee endpoint with auth
+// ✅ Invite employee (non-API route)
+app.post('/invite-employee', authenticate, async (req, res) => {
+  const { email } = req.body;
+  const manager_id = req.user.id;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { error: inviteError } = await supabase.from('invites').insert({
+      email,
+      manager_id,
+      token,
+      expires_at
+    });
+
+    if (inviteError) throw inviteError;
+
+    const inviteLink = `${process.env.CLIENT_URL}/accept-invite?token=${token}`;
+
+    res.json({ 
+      success: true,
+      inviteLink,
+      message: 'Invitation created successfully' 
+    });
+  } catch (err) {
+    console.error('Invite error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Invite employee endpoint with auth (API route)
 app.post('/api/invite-employee', authenticate, async (req, res) => {
   const { email } = req.body;
   const manager_id = req.user.id;
@@ -319,6 +314,95 @@ app.post('/api/send-invitation', async (req, res) => {
     res.json({ success: true, message: 'Invitation sent successfully' });
   } catch (error) {
     console.error('Error sending invitation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// ✅ ACCEPT INVITE ENDPOINT (NEW - FIXES THE ERROR)
+// ═══════════════════════════════════════════════════════════
+
+app.post('/accept-invite', async (req, res) => {
+  const { token, password, full_name, mobile } = req.body;
+
+  try {
+    console.log('Accept invite request:', { token, full_name });
+
+    // 1. Verify token from invites table
+    const { data: invite, error: inviteError } = await supabase
+      .from('invites')
+      .select('*')
+      .eq('token', token)
+      .single();
+
+    if (inviteError || !invite) {
+      return res.status(400).json({ error: 'Invalid or expired invitation token' });
+    }
+
+    // Check if token expired
+    if (new Date(invite.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'Invitation has expired' });
+    }
+
+    // Check if already used
+    if (invite.status === 'accepted') {
+      return res.status(400).json({ error: 'Invitation already used' });
+    }
+
+    // 2. Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: invite.email,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: full_name,
+        mobile: mobile || '',
+        role: 'employee'
+      }
+    });
+
+    if (authError) {
+      console.error('Auth error:', authError);
+      return res.status(400).json({ error: authError.message });
+    }
+
+    console.log('User created in auth:', authData.user.id);
+
+    // 3. Create profile in profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        email: invite.email,
+        full_name: full_name,
+        mobile: mobile || '',
+        role: 'employee',
+        manager_id: invite.manager_id
+      });
+
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      return res.status(400).json({ error: profileError.message });
+    }
+
+    console.log('Profile created');
+
+    // 4. Update invitation status
+    await supabase
+      .from('invites')
+      .update({ status: 'accepted' })
+      .eq('token', token);
+
+    console.log('Invitation marked as accepted');
+
+    res.json({ 
+      success: true, 
+      message: 'Account created successfully',
+      userId: authData.user.id
+    });
+
+  } catch (error) {
+    console.error('Accept invite error:', error);
     res.status(500).json({ error: error.message });
   }
 });
