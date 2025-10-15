@@ -9,6 +9,7 @@ import { KanbanSkeleton } from '../components/LoadingSkeleton'
 import TaskComments from '../components/TaskComments'
 import TaskAttachments from '../components/TaskAttachments'
 import AIAnalysisPanel from '../components/AIAnalysisPanel'
+import { sendNotification } from '../services/notificationService'
 import { analyzeTask } from '../services/aiService'
 import {
   PlusIcon,

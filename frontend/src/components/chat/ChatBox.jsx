@@ -21,7 +21,6 @@ export default function ChatBox({ roomId, roomName, onClose }) {
   const [typingUsers, setTypingUsers] = useState([])
   const [onlineUsers, setOnlineUsers] = useState(new Set())
   
-  // Dropdown states
   const [showParticipants, setShowParticipants] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
   
@@ -33,25 +32,16 @@ export default function ChatBox({ roomId, roomName, onClose }) {
   useEffect(() => {
     if (!roomId || !profile?.id) return
 
-    // Connect to WebSocket
     WebSocketService.connect(profile.id, profile.full_name)
-    
-    // Join room
     WebSocketService.joinRoom(roomId)
 
-    // Fetch initial data
     fetchMessages()
     fetchParticipants()
     markAsRead()
 
-    // Listen for new messages
     WebSocketService.onNewMessage(handleNewMessage)
-    
-    // Listen for typing indicators
     WebSocketService.onUserTyping(handleUserTyping)
     WebSocketService.onUserStoppedTyping(handleUserStoppedTyping)
-    
-    // Listen for online status
     WebSocketService.onUserOnline(handleUserOnline)
     WebSocketService.onUserOffline(handleUserOffline)
 
@@ -61,12 +51,10 @@ export default function ChatBox({ roomId, roomName, onClose }) {
     }
   }, [roomId, profile])
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     scrollToBottom()
   }, [messages])
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (participantsDropdownRef.current && !participantsDropdownRef.current.contains(event.target)) {
@@ -103,10 +91,7 @@ export default function ChatBox({ roomId, roomName, onClose }) {
         .eq('room_id', roomId)
         .order('created_at', { ascending: true })
 
-      if (error) {
-        console.error('❌ Error fetching messages:', error)
-        throw error
-      }
+      if (error) throw error
 
       console.log(`✅ Fetched ${data?.length || 0} messages`)
       setMessages(data || [])
@@ -156,7 +141,6 @@ export default function ChatBox({ roomId, roomName, onClose }) {
   const handleNewMessage = (message) => {
     setMessages(prev => [...prev, message])
     
-    // Mark as read if chat is open
     if (message.sender_id !== profile.id) {
       markAsRead()
     }
@@ -189,40 +173,54 @@ export default function ChatBox({ roomId, roomName, onClose }) {
     })
   }
 
- const handleSendMessage = (messageText) => {
-  if (!messageText.trim()) return
+  // ✅ FIXED: Send message with notifications via API
+  const handleSendMessage = async (messageText) => {
+    if (!messageText.trim()) return
 
-  // Send message via WebSocket
-  WebSocketService.sendMessage(
-    roomId,
-    messageText,
-    profile.id,
-    profile.full_name,
-    profile.role,
-    'text'
-  )
+    // Send message via WebSocket
+    WebSocketService.sendMessage(
+      roomId,
+      messageText,
+      profile.id,
+      profile.full_name,
+      profile.role,
+      'text'
+    )
 
-  // ✅ Send notification to all other participants
-  participants.forEach(async (participant) => {
-    if (participant.id !== profile.id) {
-      await sendNotification({
-        userId: participant.id,
-        type: 'chat',
-        title: `💬 ${profile.full_name} in ${roomName}`,
-        message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
-        link: profile.role === 'manager' 
-          ? `/projects/${roomId}/chat` 
-          : `/employee/projects/${roomId}/chat`,
-        projectId: roomId,
-      })
+    // ✅ Send notifications to participants via backend API
+    try {
+      const token = localStorage.getItem('supabase.auth.token') || 
+                    (await supabase.auth.getSession()).data?.session?.access_token;
+
+      for (const participant of participants) {
+        if (participant.id !== profile.id) {
+          await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/notifications/send`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              userId: participant.id,
+              type: 'chat',
+              title: `💬 ${profile.full_name} in ${roomName}`,
+              message: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
+              link: profile.role === 'manager' 
+                ? `/projects/${roomId}/chat` 
+                : `/employee/projects/${roomId}/chat`,
+              projectId: roomId,
+            })
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Notification error:', error);
+      // Don't show error to user, notifications are not critical
     }
-  })
-}
-
+  }
 
   const handleFileUpload = async (file) => {
     try {
-      // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
       const filePath = `chat-files/${roomId}/${fileName}`
@@ -233,12 +231,10 @@ export default function ChatBox({ roomId, roomName, onClose }) {
 
       if (uploadError) throw uploadError
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('chat-attachments')
         .getPublicUrl(filePath)
 
-      // Send file message
       WebSocketService.sendMessage(
         roomId,
         `Sent a file: ${file.name}`,
@@ -329,10 +325,7 @@ export default function ChatBox({ roomId, roomName, onClose }) {
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {onClose && (
-            <button
-              onClick={onClose}
-              className="lg:hidden p-1 hover:bg-white/20 rounded"
-            >
+            <button onClick={onClose} className="lg:hidden p-1 hover:bg-white/20 rounded">
               <ArrowLeftIcon className="h-5 w-5 text-white" />
             </button>
           )}
@@ -345,7 +338,6 @@ export default function ChatBox({ roomId, roomName, onClose }) {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Participants Dropdown */}
           <div className="relative" ref={participantsDropdownRef}>
             <button
               onClick={() => setShowParticipants(!showParticipants)}
@@ -357,7 +349,6 @@ export default function ChatBox({ roomId, roomName, onClose }) {
               </span>
             </button>
 
-            {/* Participants Dropdown Panel */}
             {showParticipants && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-2xl border-2 border-gray-200 z-50 max-h-96 overflow-hidden">
                 <div className="p-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
@@ -368,7 +359,6 @@ export default function ChatBox({ roomId, roomName, onClose }) {
                 </div>
                 
                 <div className="overflow-y-auto max-h-72">
-                  {/* Online Users */}
                   <div className="p-3 bg-green-50 border-b border-gray-200">
                     <p className="text-xs font-bold text-green-700 uppercase mb-2">
                       🟢 Online ({onlineUsers.size})
@@ -376,10 +366,7 @@ export default function ChatBox({ roomId, roomName, onClose }) {
                     {participants
                       .filter(p => onlineUsers.has(p.id))
                       .map(participant => (
-                        <div
-                          key={participant.id}
-                          className="flex items-center gap-3 p-2 hover:bg-white rounded-lg transition mb-1"
-                        >
+                        <div key={participant.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg transition mb-1">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-bold">
                             {participant.full_name?.charAt(0).toUpperCase()}
                           </div>
@@ -407,7 +394,6 @@ export default function ChatBox({ roomId, roomName, onClose }) {
                     )}
                   </div>
 
-                  {/* Offline Users */}
                   <div className="p-3">
                     <p className="text-xs font-bold text-gray-500 uppercase mb-2">
                       ⚫ Offline ({participants.length - onlineUsers.size})
@@ -415,10 +401,7 @@ export default function ChatBox({ roomId, roomName, onClose }) {
                     {participants
                       .filter(p => !onlineUsers.has(p.id))
                       .map(participant => (
-                        <div
-                          key={participant.id}
-                          className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition mb-1 opacity-60"
-                        >
+                        <div key={participant.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition mb-1 opacity-60">
                           <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold">
                             {participant.full_name?.charAt(0).toUpperCase()}
                           </div>
@@ -447,16 +430,11 @@ export default function ChatBox({ roomId, roomName, onClose }) {
             )}
           </div>
 
-          {/* Options Menu */}
           <div className="relative" ref={optionsDropdownRef}>
-            <button
-              onClick={() => setShowOptions(!showOptions)}
-              className="p-2 hover:bg-white/20 rounded-lg transition"
-            >
+            <button onClick={() => setShowOptions(!showOptions)} className="p-2 hover:bg-white/20 rounded-lg transition">
               <EllipsisVerticalIcon className="h-6 w-6 text-white" />
             </button>
 
-            {/* Options Dropdown Panel */}
             {showOptions && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-2xl border-2 border-gray-200 z-50 overflow-hidden">
                 <div className="p-2">
@@ -505,10 +483,7 @@ export default function ChatBox({ roomId, roomName, onClose }) {
           </div>
 
           {onClose && (
-            <button
-              onClick={onClose}
-              className="hidden lg:block p-2 hover:bg-white/20 rounded-lg transition"
-            >
+            <button onClick={onClose} className="hidden lg:block p-2 hover:bg-white/20 rounded-lg transition">
               <XMarkIcon className="h-6 w-6 text-white" />
             </button>
           )}
@@ -516,10 +491,7 @@ export default function ChatBox({ roomId, roomName, onClose }) {
       </div>
 
       {/* Messages Area */}
-      <div 
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50"
-      >
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <UserGroupIcon className="h-16 w-16 mb-4 text-gray-300" />

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function AcceptInvite() {
   const [searchParams] = useSearchParams();
@@ -15,11 +16,13 @@ export default function AcceptInvite() {
 
   useEffect(() => {
     if (!token) {
-      navigate('/');
+      toast.error('Invalid invitation link');
+      navigate('/login');
     }
   }, [token, navigate]);
 
-  const acceptInvite = async () => {
+  const acceptInvite = async (e) => {
+    e.preventDefault(); // ✅ PREVENT DEFAULT FORM BEHAVIOR
     setError(null);
 
     // Validation
@@ -33,15 +36,19 @@ export default function AcceptInvite() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
     setLoading(true);
+    
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/accept-invite`, {
-        method: 'POST',
+      const url = `${import.meta.env.VITE_BACKEND_URL}/accept-invite`;
+      console.log('🔄 Calling:', url);
+
+      const response = await fetch(url, {
+        method: 'POST', // ✅ EXPLICIT POST
         headers: {
           'Content-Type': 'application/json'
         },
@@ -53,16 +60,21 @@ export default function AcceptInvite() {
         })
       });
 
+      console.log('📥 Response status:', response.status);
+
       const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.error || 'Error accepting invite. Please try again.');
       }
 
-      alert('✅ Account created successfully! You can now log in.');
-      navigate('/login?role=employee');
+      toast.success('✅ Account created successfully! You can now log in.');
+      setTimeout(() => {
+        navigate('/login?role=employee');
+      }, 2000);
       
     } catch (err) {
+      console.error('❌ Error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -75,6 +87,8 @@ export default function AcceptInvite() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center px-4">
+      <Toaster position="top-right" />
+      
       <div className="p-8 bg-white/10 backdrop-blur border border-white/20 rounded-xl shadow-2xl w-full max-w-md">
         <h2 className="text-2xl font-bold text-center mb-6 text-white">Accept Invitation</h2>
         
@@ -84,7 +98,8 @@ export default function AcceptInvite() {
           </div>
         )}
         
-        <div className="space-y-4">
+        {/* ✅ FORM WITH ONSUBMIT */}
+        <form onSubmit={acceptInvite} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">
               Full Name *
@@ -94,6 +109,7 @@ export default function AcceptInvite() {
               placeholder="John Doe"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              required
               className="w-full rounded-md bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-400 border border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
@@ -117,9 +133,10 @@ export default function AcceptInvite() {
             </label>
             <input
               type="password"
-              placeholder="Min 6 characters"
+              placeholder="Min 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
               className="w-full rounded-md bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-400 border border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
@@ -133,18 +150,20 @@ export default function AcceptInvite() {
               placeholder="Re-enter password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              required
               className="w-full rounded-md bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-400 border border-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
           
+          {/* ✅ SUBMIT BUTTON */}
           <button
-            onClick={acceptInvite}
+            type="submit"
             disabled={loading || !password || !confirmPassword || !fullName}
             className="w-full bg-gradient-to-r from-cyan-400 to-indigo-500 text-white py-2.5 rounded-md font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
             {loading ? 'Creating Account...' : 'Create Account & Join Team'}
           </button>
-        </div>
+        </form>
 
         <div className="mt-6 text-center">
           <button
