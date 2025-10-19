@@ -41,9 +41,9 @@ export default function AddMember() {
       }
 
       console.log('✅ Token obtained')
-      console.log('📤 Sending request to:', `${BACKEND_URL}/create-employee`)
+      console.log('📤 Sending request to:', `${BACKEND_URL}/api/create-employee`)
 
-      const res = await fetch(`${BACKEND_URL}/create-employee`, {
+      const res = await fetch(`${BACKEND_URL}/api/create-employee`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,9 +97,9 @@ export default function AddMember() {
         return
       }
 
-      console.log('📤 Sending invite to:', `${BACKEND_URL}/invite-employee`)
+      console.log('📤 Sending invite to:', `${BACKEND_URL}/api/invite-employee`)
 
-      const res = await fetch(`${BACKEND_URL}/invite-employee`, {
+      const res = await fetch(`${BACKEND_URL}/api/invite-employee`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
