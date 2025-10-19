@@ -7,24 +7,112 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// ✅ Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 // ═══════════════════════════════════════════════════════════
-// NOTIFICATION FUNCTIONS
+// SEND NOTIFICATION TO DATABASE + OPTIONAL EMAIL
 // ═══════════════════════════════════════════════════════════
 
 /**
- * Send task assigned email
+ * Send notification (saves to DB + sends email if enabled)
  */
+async function sendNotification(userId, type, title, message, link, projectId) {
+  try {
+    // 1. Save to database
+    const { data: notification, error: dbError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        type: type,
+        title: title,
+        message: message,
+        link: link,
+        project_id: projectId,
+        is_read: false
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      console.error('❌ Database notification error:', dbError);
+      return { success: false, error: dbError.message };
+    }
+
+    console.log('✅ Notification saved to DB:', notification.id);
+
+    // 2. Check if user wants email notifications
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name, notification_preferences')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) {
+      return { success: true, notificationId: notification.id, emailSent: false };
+    }
+
+    const prefs = profile.notification_preferences || {};
+    
+    // Check if email notifications are enabled
+    if (prefs.emailNotifications === false) {
+      console.log('⚠️  Email notifications disabled for user');
+      return { success: true, notificationId: notification.id, emailSent: false };
+    }
+
+    // 3. Send email notification
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      try {
+        const htmlContent = getEmailTemplate('default', {
+          userName: profile.full_name,
+          message: message,
+          link: link || `${process.env.CLIENT_URL}/employee-dashboard`
+        });
+
+        await transporter.sendMail({
+          from: `ProManage+ <${process.env.EMAIL_USER}>`,
+          to: profile.email,
+          subject: title,
+          html: htmlContent
+        });
+
+        console.log('✅ Email notification sent to:', profile.email);
+        return { success: true, notificationId: notification.id, emailSent: true };
+      } catch (emailError) {
+        console.error('⚠️  Email sending failed:', emailError);
+        // Don't fail if email fails, notification is already saved
+        return { success: true, notificationId: notification.id, emailSent: false };
+      }
+    }
+
+    return { success: true, notificationId: notification.id, emailSent: false };
+  } catch (error) {
+    console.error('❌ Send notification error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TASK ASSIGNED EMAIL
+// ═══════════════════════════════════════════════════════════
+
 async function sendTaskAssignedEmail(taskData, assigneeEmail, assigneeName) {
   try {
-    const htmlContent = getEmailTemplate('task_assigned', {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log('⚠️  Email not configured');
+      return { success: false, error: 'Email not configured' };
+    }
+
+    const htmlContent = getEmailTemplate('taskassigned', {
       userName: assigneeName,
       taskTitle: taskData.title,
       taskDescription: taskData.description,
@@ -32,17 +120,17 @@ async function sendTaskAssignedEmail(taskData, assigneeEmail, assigneeName) {
       deadline: taskData.deadline,
       projectName: taskData.projectName,
       managerName: taskData.managerName,
-      link: `${process.env.CLIENT_URL}/employee/tasks`,
+      link: `${process.env.CLIENT_URL}/employee-tasks`
     });
 
     await transporter.sendMail({
-      from: `"ProManage+ Team" <${process.env.EMAIL_USER}>`,
+      from: `ProManage+ Team <${process.env.EMAIL_USER}>`,
       to: assigneeEmail,
-      subject: `📋 New Task Assigned: ${taskData.title}`,
-      html: htmlContent,
+      subject: `New Task Assigned: ${taskData.title}`,
+      html: htmlContent
     });
 
-    console.log(`✅ Task assigned email sent to ${assigneeEmail}`);
+    console.log('✅ Task assigned email sent to:', assigneeEmail);
     return { success: true };
   } catch (error) {
     console.error('❌ Error sending task assigned email:', error);
@@ -50,27 +138,32 @@ async function sendTaskAssignedEmail(taskData, assigneeEmail, assigneeName) {
   }
 }
 
-/**
- * Send task completed email
- */
+// ═══════════════════════════════════════════════════════════
+// TASK COMPLETED EMAIL
+// ═══════════════════════════════════════════════════════════
+
 async function sendTaskCompletedEmail(taskData, managerEmail, managerName, userName) {
   try {
-    const htmlContent = getEmailTemplate('task_completed', {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return { success: false, error: 'Email not configured' };
+    }
+
+    const htmlContent = getEmailTemplate('taskcompleted', {
       managerName,
       userName,
       taskTitle: taskData.title,
       projectName: taskData.projectName,
-      link: `${process.env.CLIENT_URL}/projects/${taskData.projectId}/tasks`,
+      link: `${process.env.CLIENT_URL}/projects/${taskData.projectId}/tasks`
     });
 
     await transporter.sendMail({
-      from: `"ProManage+ Team" <${process.env.EMAIL_USER}>`,
+      from: `ProManage+ Team <${process.env.EMAIL_USER}>`,
       to: managerEmail,
-      subject: `✅ Task Completed: ${taskData.title}`,
-      html: htmlContent,
+      subject: `Task Completed: ${taskData.title}`,
+      html: htmlContent
     });
 
-    console.log(`✅ Task completed email sent to ${managerEmail}`);
+    console.log('✅ Task completed email sent to:', managerEmail);
     return { success: true };
   } catch (error) {
     console.error('❌ Error sending task completed email:', error);
@@ -78,36 +171,47 @@ async function sendTaskCompletedEmail(taskData, managerEmail, managerName, userN
   }
 }
 
-/**
- * Send deadline reminder email
- */
+// ═══════════════════════════════════════════════════════════
+// DEADLINE REMINDER EMAIL
+// ═══════════════════════════════════════════════════════════
+
 async function sendDeadlineReminderEmail(taskData, userEmail, userName) {
   try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return { success: false, error: 'Email not configured' };
+    }
+
     const deadline = new Date(taskData.deadline);
     const now = new Date();
     const daysRemaining = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-    
-    let daysText = '';
-    if (daysRemaining === 0) daysText = 'today';
-    else if (daysRemaining === 1) daysText = 'tomorrow';
-    else daysText = `in ${daysRemaining} days`;
 
-    const htmlContent = getEmailTemplate('deadline_reminder', {
+    let daysText;
+    if (daysRemaining < 0) {
+      daysText = 'overdue';
+    } else if (daysRemaining === 0) {
+      daysText = 'today';
+    } else if (daysRemaining === 1) {
+      daysText = 'tomorrow';
+    } else {
+      daysText = `in ${daysRemaining} days`;
+    }
+
+    const htmlContent = getEmailTemplate('deadlinereminder', {
       userName,
       taskTitle: taskData.title,
       deadline: taskData.deadline,
       daysRemaining: daysText,
-      link: `${process.env.CLIENT_URL}/employee/tasks`,
+      link: `${process.env.CLIENT_URL}/employee-tasks`
     });
 
     await transporter.sendMail({
-      from: `"ProManage+ Team" <${process.env.EMAIL_USER}>`,
+      from: `ProManage+ Team <${process.env.EMAIL_USER}>`,
       to: userEmail,
       subject: `⏰ Deadline Reminder: ${taskData.title}`,
-      html: htmlContent,
+      html: htmlContent
     });
 
-    console.log(`✅ Deadline reminder sent to ${userEmail}`);
+    console.log('✅ Deadline reminder sent to:', userEmail);
     return { success: true };
   } catch (error) {
     console.error('❌ Error sending deadline reminder:', error);
@@ -115,11 +219,16 @@ async function sendDeadlineReminderEmail(taskData, userEmail, userName) {
   }
 }
 
-/**
- * Send daily digest email
- */
+// ═══════════════════════════════════════════════════════════
+// DAILY DIGEST EMAIL
+// ═══════════════════════════════════════════════════════════
+
 async function sendDailyDigestEmail(userId, userEmail, userName) {
   try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return { success: false, error: 'Email not configured' };
+    }
+
     // Fetch user's tasks
     const { data: tasks } = await supabase
       .from('tasks')
@@ -138,7 +247,7 @@ async function sendDailyDigestEmail(userId, userEmail, userName) {
       }).length || 0,
       overdue: tasks?.filter(t => {
         return t.status !== 'done' && t.deadline && new Date(t.deadline) < now;
-      }).length || 0,
+      }).length || 0
     };
 
     const upcomingTasks = tasks
@@ -146,22 +255,22 @@ async function sendDailyDigestEmail(userId, userEmail, userName) {
       .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
       .slice(0, 3) || [];
 
-    const htmlContent = getEmailTemplate('daily_digest', {
+    const htmlContent = getEmailTemplate('dailydigest', {
       userName,
       stats,
       upcomingTasks,
       link: `${process.env.CLIENT_URL}/employee-dashboard`,
-      unsubscribeLink: `${process.env.CLIENT_URL}/settings`,
+      unsubscribeLink: `${process.env.CLIENT_URL}/settings`
     });
 
     await transporter.sendMail({
-      from: `"ProManage+ Team" <${process.env.EMAIL_USER}>`,
+      from: `ProManage+ Team <${process.env.EMAIL_USER}>`,
       to: userEmail,
       subject: `📊 Your Daily Summary - ${new Date().toLocaleDateString()}`,
-      html: htmlContent,
+      html: htmlContent
     });
 
-    console.log(`✅ Daily digest sent to ${userEmail}`);
+    console.log('✅ Daily digest sent to:', userEmail);
     return { success: true };
   } catch (error) {
     console.error('❌ Error sending daily digest:', error);
@@ -170,8 +279,9 @@ async function sendDailyDigestEmail(userId, userEmail, userName) {
 }
 
 module.exports = {
+  sendNotification,
   sendTaskAssignedEmail,
   sendTaskCompletedEmail,
   sendDeadlineReminderEmail,
-  sendDailyDigestEmail,
+  sendDailyDigestEmail
 };
