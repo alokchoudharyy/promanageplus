@@ -15,10 +15,9 @@ const transporter = nodemailer.createTransport({
   secure: false,
   auth: {
     user: 'apikey',
-    pass: process.env.SENDGRID_API_KEY || process.env.EMAIL_PASS
+    pass: process.env.EMAIL_PASS
   }
 });
-
 
 // ═══════════════════════════════════════════════════════════
 // SEND NOTIFICATION TO DATABASE + OPTIONAL EMAIL
