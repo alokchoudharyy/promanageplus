@@ -107,17 +107,17 @@ const supabase = createClient(
 
 // ═══════════════════════════════════════════════════════════
 // ✅ Email Transporter Configuration
-// ═══════════════════════════════════════════════════════════
+// ✅ NEW CODE - SendGrid SMTP
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.sendgrid.net',
+  port: 587,
+  secure: false, // Use TLS
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false
+    user: 'apikey', // This is literally the string "apikey"
+    pass: process.env.SENDGRID_API_KEY || process.env.EMAIL_PASS
   }
 });
+
 
 transporter.verify((error, success) => {
   if (error) {
