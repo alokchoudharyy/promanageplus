@@ -1,40 +1,41 @@
-/* src/components/Logo.jsx */
-import { SparklesIcon } from "@heroicons/react/24/solid"
+/* src/components/Logo.jsx - FINAL FIXED VERSION WITHOUT LINK */
+import { BoltIcon } from '@heroicons/react/24/solid';
 
-export default function Logo({ size = "default", showText = true, className = "" }) {
+export default function Logo({ size = 'default', showText = true, className = '' }) {
   const sizes = {
     small: {
-      icon: "w-6 h-6",
-      text: "text-lg",
-      blur: "blur-lg"
+      circle: 'w-8 h-8',
+      icon: 'w-4 h-4',
+      text: 'text-base ml-2',
     },
     default: {
-      icon: "w-8 h-8",
-      text: "text-2xl",
-      blur: "blur-xl"
+      circle: 'w-10 h-10',
+      icon: 'w-5 h-5',
+      text: 'text-lg ml-2.5',
     },
     large: {
-      icon: "w-20 h-20 md:w-24 md:h-24",
-      text: "text-4xl md:text-5xl",
-      blur: "blur-2xl"
+      circle: 'w-14 h-14',
+      icon: 'w-7 h-7',
+      text: 'text-2xl ml-3',
     }
-  }
+  };
 
-  const currentSize = sizes[size] || sizes.default
+  const s = sizes[size];
 
+  // ✅ NO LINK HERE - Just return div
   return (
-    <div className={`flex items-center gap-2 group cursor-pointer ${className}`}>
-      <div className="relative">
-        <SparklesIcon 
-          className={`${currentSize.icon} text-cyan-400 group-hover:rotate-180 transition-transform duration-700 ${size === 'large' ? 'drop-shadow-[0_0_25px_rgba(34,211,238,0.5)]' : ''}`} 
-        />
-        <div className={`absolute inset-0 ${currentSize.blur} bg-cyan-400/30 group-hover:bg-cyan-400/50 transition-all ${size === 'large' ? 'animate-pulse' : ''}`} />
+    <div className={`inline-flex items-center group ${className}`}>
+      <div className={`${s.circle} rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg group-hover:shadow-cyan-500/50 transition-all duration-300 group-hover:scale-110`}>
+        <BoltIcon className={`${s.icon} text-white`} />
       </div>
       {showText && (
-        <h1 className={`${currentSize.text} font-bold tracking-tight bg-gradient-to-r from-indigo-400 via-sky-400 to-cyan-300 bg-clip-text text-transparent animate-gradient bg-[length:200%_auto]`}>
-          ProManage+
-        </h1>
+        <span className={`${s.text} font-bold`}>
+          <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+            ProManage
+          </span>
+          <span className="text-cyan-400">+</span>
+        </span>
       )}
     </div>
-  )
+  );
 }

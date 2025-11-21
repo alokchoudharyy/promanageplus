@@ -46,7 +46,6 @@ import EmployeePerformancePage from './pages/EmployeePerformancePage'
 import EmployeeCalendarPage from './pages/EmployeeCalendarPage'
 import EmployeeSettingsPage from './pages/EmployeeSettingsPage'
 import EmployeeChatsPage from './pages/EmployeeChatsPage'
-
 import EmployeeTimesheetPage from './pages/EmployeeTimesheetPage'
 import EmployeeAnnouncementsPage from './pages/EmployeeAnnouncementsPage'
 import EmployeeDocumentsPage from './pages/EmployeeDocumentsPage'
@@ -70,12 +69,9 @@ export default function App() {
             <Route path="/update-password" element={<UpdatePassword />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />  
             <Route path="/auth/callback" element={<AuthCallback />} /> 
-            
-
             {/* ═══════════════════════════════════════════════════ */}
             {/* Manager Area (Protected + With Layout) */}
             {/* ═══════════════════════════════════════════════════ */}
-            
             {/* Manager Dashboard */}
             <Route
               path="/manager"
@@ -87,7 +83,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Projects Page */}
             <Route
               path="/projects"
@@ -99,7 +94,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Project Tasks Page */}
             <Route
               path="/projects/:projectId/tasks"
@@ -173,29 +167,27 @@ export default function App() {
             />
             
             {/* Profile Page - With Layout */}
-<Route
-  path="/profile"
-  element={
-    <ProtectedRoute role="manager">
-      <ManagerLayout>
-        <ProfilePage />
-      </ManagerLayout>
-    </ProtectedRoute>
-  }
-/>
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute role="manager">
+                  <ManagerLayout>
+                    <ProfilePage />
+                  </ManagerLayout>
+                </ProtectedRoute>
+              }
+            />
 
-<Route
-  path="/manager/profile"
-  element={
-    <ProtectedRoute role="manager">
-      <ManagerLayout>
-        <ProfilePage />
-      </ManagerLayout>
-    </ProtectedRoute>
-  }
-/>
-
-
+          <Route
+            path="/manager/profile"
+            element={
+              <ProtectedRoute role="manager">
+                <ManagerLayout>
+                  <ProfilePage />
+                </ManagerLayout>
+              </ProtectedRoute>
+            }
+          />
             {/* ✅ Activity Log Page */}
             <Route
               path="/activity"
@@ -220,7 +212,7 @@ export default function App() {
               }
             />
 
-            {/* ✅ Announcements Page */}
+            {/*✅ Announcements Page */}
             <Route
               path="/announcements"
               element={
@@ -231,18 +223,18 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-  {/* ✅ Documents Page - Manager - ADD THIS */}
-         <Route
-  path="/documents"
-  element={
-    <ProtectedRoute role="manager">
-      <ManagerLayout>
-        <DocumentsPage />
-      </ManagerLayout>
-    </ProtectedRoute>
-  }
-/>
 
+          {/* ✅ Documents Page - Manager - ADD THIS */}
+                  <Route
+                    path="/documents"
+                    element={
+                <ProtectedRoute role="manager">
+                  <ManagerLayout>
+                    <DocumentsPage />
+                  </ManagerLayout>
+              </ProtectedRoute>
+            }
+          />
             {/* Settings Page */}
             <Route
               path="/settings"
@@ -306,7 +298,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Employee Documents - FIXED: Added properly */}
             <Route
               path="/employee/documents"
@@ -318,7 +309,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Employee Profile - FIXED: Added properly */}
             <Route
               path="/employee/profile"
@@ -330,7 +320,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Employee Calendar */}
             <Route
               path="/employee/calendar"
@@ -342,7 +331,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Employee Chats List */}
             <Route
               path="/employee/chats"
@@ -354,7 +342,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Employee Project Chat */}
             <Route
               path="/employee/projects/:projectId/chat"
@@ -366,7 +353,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Employee Performance */}
             <Route
               path="/employee/performance"
